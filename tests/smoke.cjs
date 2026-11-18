@@ -15,6 +15,17 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
  for(let i=0;i<7;i++){
   await p.click(`[data-day="${i}"]`);
   assert.equal(await p.locator('.stop').count(),await p.evaluate(i=>days[i].stops.length,i));
+  assert.equal(await p.locator('.daily-map-svg').count(),1);
+  const mapIds=await p.evaluate(i=>dayMapPoints(i),i);
+  assert.equal(await p.locator('[data-map-pin]').count(),mapIds.length);
+  assert.equal(await p.locator('.map-legend li').count(),mapIds.length);
+  const badges=await p.locator('.map-pin-badge').evaluateAll(nodes=>nodes.map(n=>[+n.getAttribute('cx'),+n.getAttribute('cy')]));
+  for(let a=0;a<badges.length;a++){
+   assert.ok(badges[a][0]>=14&&badges[a][0]<=326&&badges[a][1]>=14&&badges[a][1]<=296,'pin outside SVG');
+   for(let b=a+1;b<badges.length;b++) assert.ok(Math.hypot(badges[a][0]-badges[b][0],badges[a][1]-badges[b][1])>=35,'overlapping numbered pins');
+  }
+  assert.ok(!(await p.locator('.daily-map-svg').innerHTML()).includes('NaN'));
+  await p.locator('.daily-map').screenshot({path:output+`/okinawa-map-day-${i+1}.png`});
   const href=await p.locator('.route-row a').getAttribute('href');
   const url=new URL(href);assert.equal(url.hostname,'www.google.com');assert.equal(url.searchParams.get('travelmode'),'driving');assert.ok(url.searchParams.get('destination'));
  }
@@ -41,6 +52,16 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
   for(const tab of ['itinerary','places','stays','prepare']){
    await p.click(`[data-tab="${tab}"]`);await p.waitForTimeout(100);
    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`horizontal overflow ${width}/${tab}`);
+   if(tab==='itinerary'){
+    for(let day=0;day<7;day++){
+     await p.click(`[data-day="${day}"]`);
+     assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`daily map overflow ${width}/${day}`);
+     const bounds=await p.evaluate(()=>{const m=document.querySelector('.daily-map').getBoundingClientRect(),c=document.querySelector('.day-content').getBoundingClientRect();return {mx:m.x,my:m.y,mw:m.width,mb:m.bottom,cx:c.x,cy:c.y,cw:c.width};});
+     assert.ok(bounds.mw>=width*(width<=390?.72:.15),'map too small');
+     if(width>1100)assert.ok(bounds.mx>=bounds.cx+bounds.cw-1,'desktop map not beside timeline');
+     else assert.ok(bounds.mb<=bounds.cy+2,'mobile map not above timeline');
+    }
+   }
   }
  }
  await p.setViewportSize({width:390,height:844});await p.click('[data-tab="itinerary"]');await p.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await p.screenshot({path:output+'/okinawa-mobile.png',fullPage:true});
