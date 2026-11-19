@@ -11,11 +11,23 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
  const p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));
  await p.goto(base);await p.waitForSelector('.day-panel');
  assert.equal(await p.locator('.day-button').count(),7);
+ assert.equal(await p.locator('#flight-overview .flight-card').count(),2);
+ const outbound=await p.locator('[data-flight="outbound"]').innerText();
+ for(const t of ['CI 0120','2027/01/13','08:10','10:50','TPE','OKA','台灣時間 UTC+8','日本時間 UTC+9'])assert.ok(outbound.includes(t),`outbound missing ${t}`);
+ const inbound=await p.locator('[data-flight="return"]').innerText();
+ for(const t of ['CI 0121','2027/01/19','11:55','12:35','日本時間 UTC+9','台灣時間 UTC+8'])assert.ok(inbound.includes(t),`return missing ${t}`);
+ // The same-day clock difference is not the actual flight duration.
+ assert.equal((Date.parse('2027-01-13T10:50:00+09:00')-Date.parse('2027-01-13T08:10:00+08:00'))/60000,100);
+ assert.equal((Date.parse('2027-01-19T12:35:00+08:00')-Date.parse('2027-01-19T11:55:00+09:00'))/60000,100);
+ await p.locator('#flight-overview').screenshot({path:output+'/okinawa-flights-desktop.png'});
  const summary=await p.evaluate(()=>({days:days.length,places:Object.keys(places).length,checklist:checklist.length,stops:days.reduce((n,d)=>n+d.stops.length,0)}));
  for(let i=0;i<7;i++){
   await p.click(`[data-day="${i}"]`);
   assert.equal(await p.locator('.stop').count(),await p.evaluate(i=>days[i].stops.length,i));
   assert.equal(await p.locator('.daily-map-svg').count(),1);
+  if(i===0){assert.ok((await p.locator('.timeline').innerText()).includes('05:30'));assert.ok((await p.locator('.day-flight-summary').innerText()).includes('CI 0120'));}
+  if(i===5){assert.ok((await p.locator('.timeline').innerText()).includes('優先方案'));assert.ok((await p.locator('.timeline').innerText()).includes('09:00'));}
+  if(i===6){for(const text of ['08:00','08:15','09:00','11:55','12:35'])assert.ok((await p.locator('.timeline').innerText()).includes(text));assert.ok((await p.locator('.day-flight-summary').innerText()).includes('CI 0121'));}
   const mapIds=await p.evaluate(i=>dayMapPoints(i),i);
   assert.equal(await p.locator('[data-map-pin]').count(),mapIds.length);
   assert.equal(await p.locator('.map-legend li').count(),mapIds.length);
@@ -79,10 +91,14 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
   }
  }
  await p.setViewportSize({width:390,height:844});await p.click('[data-tab="itinerary"]');await p.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await p.screenshot({path:output+'/okinawa-mobile.png',fullPage:true});
+ await p.locator('#flight-overview').screenshot({path:output+'/okinawa-flights-mobile.png'});
  await p.evaluate(()=>beforePrint());assert.equal(await p.locator('.day-panel').count(),7);
+ assert.equal(await p.locator('#view .flight-card').count(),2);
  await p.pdf({path:output+'/okinawa-itinerary.pdf',format:'A4',printBackground:true,margin:{top:'12mm',bottom:'12mm',left:'10mm',right:'10mm'}});
  await p.evaluate(()=>afterPrint());assert.equal(await p.locator('.day-panel').count(),1);
  const blocked=await browser.newContext();await blocked.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw new Error('blocked')}});});const bp=await blocked.newPage();bp.on('pageerror',e=>errors.push(e.message));await bp.goto(base);await bp.waitForSelector('.day-panel');assert.ok((await bp.locator('.notes-status').innerText()).includes('無法儲存'));
+ const migration=await browser.newContext();await migration.addInitScript(()=>localStorage.setItem('okinawa2027.v1',JSON.stringify({done:{'0-0':true,'6-0':true,'1-0':true},notes:{'0':'保留的旅遊筆記'},checks:{license:true}})));const mp=await migration.newPage();await mp.goto(base);await mp.waitForSelector('.day-panel');
+ const migrated=await mp.evaluate(()=>({done:saved.done,notes:saved.notes,checks:saved.checks}));assert.equal(migrated.done['0-0'],undefined);assert.equal(migrated.done['6-0'],undefined);assert.equal(migrated.done['1-0'],true);assert.equal(migrated.notes['0'],'保留的旅遊筆記');assert.equal(migrated.checks.license,true);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',base,...summary,viewports:[320,375,390,768,1440],tested:['all days','maps','filters','search','notes escaping and persistence','checklist persistence','JSON download','deep links','all tabs horizontal overflow','print all days','blocked storage fallback'],errors},null,2));
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
