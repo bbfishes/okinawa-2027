@@ -1,5 +1,5 @@
 /* Local SVG maps: no remote tiles or API keys; north is always up. */
-const mapNames = {airport:'那霸機場',lch:'LCH 海濱飯店',torifito:'那霸旭橋托里菲托',aquarium:'美麗海水族館',kishimoto:'岸本食堂本店',kouri:'古宇利海灘',shrimp:'古宇利蝦蝦飯',manzamo:'萬座毛',beef:'琉球的牛・恩納本館',village:'北谷美國村',kokusai:'國際通',world:'沖繩世界・玉泉洞',rakusui:'山之茶屋・樂水',hamacha:'濱邊之茶屋',senaga:'瀨長島',pancake:'幸福鬆餅・沖繩店'};
+const mapNames = {rental:'Hello 租車・与根門市',airport:'那霸機場',lch:'LCH 海濱飯店',torifito:'那霸旭橋托里菲托',aquarium:'美麗海水族館',kishimoto:'岸本食堂本店',kouri:'古宇利海灘',shrimp:'古宇利蝦蝦飯',manzamo:'萬座毛',beef:'琉球的牛・恩納本館',village:'北谷美國村',kokusai:'國際通',world:'沖繩世界・玉泉洞',rakusui:'山之茶屋・樂水',hamacha:'濱邊之茶屋',senaga:'瀨長島',pancake:'幸福鬆餅・沖繩店'};
 function dayMapPoints(index){
  const d=days[index];
  return [...new Set([d.route[0],...d.stops.map(s=>s[1]),d.stay].filter(id=>id && mapGeography.coordinates[id]))];

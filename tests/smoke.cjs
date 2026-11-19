@@ -20,13 +20,18 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
  assert.equal((Date.parse('2027-01-13T10:50:00+09:00')-Date.parse('2027-01-13T08:10:00+08:00'))/60000,100);
  assert.equal((Date.parse('2027-01-19T12:35:00+08:00')-Date.parse('2027-01-19T11:55:00+09:00'))/60000,100);
  await p.locator('#flight-overview').screenshot({path:output+'/okinawa-flights-desktop.png'});
+ const rentalText=await p.locator('#rental-overview').innerText();
+ for(const t of ['Hello rent a car','Toyota PIXIS EPOCH 或同級','2027/1/13（三）','2027/1/18（一）','11:00','与根8-8','時間衝突','尚未獲供應商確認'])assert.ok(rentalText.includes(t),`rental missing ${t}`);
+ assert.equal((Date.parse('2027-01-13T11:00:00+09:00')-Date.parse('2027-01-13T10:50:00+09:00'))/60000,10);
+ assert.equal(await p.locator('#rental-overview a[href*="maps"]').count(),1);
+ await p.locator('#rental-overview').screenshot({path:output+'/okinawa-rental-desktop.png'});
  const summary=await p.evaluate(()=>({days:days.length,places:Object.keys(places).length,checklist:checklist.length,stops:days.reduce((n,d)=>n+d.stops.length,0)}));
  for(let i=0;i<7;i++){
   await p.click(`[data-day="${i}"]`);
   assert.equal(await p.locator('.stop').count(),await p.evaluate(i=>days[i].stops.length,i));
   assert.equal(await p.locator('.daily-map-svg').count(),1);
-  if(i===0){assert.ok((await p.locator('.timeline').innerText()).includes('05:30'));assert.ok((await p.locator('.day-flight-summary').innerText()).includes('CI 0120'));}
-  if(i===5){assert.ok((await p.locator('.timeline').innerText()).includes('優先方案'));assert.ok((await p.locator('.timeline').innerText()).includes('09:00'));}
+  if(i===0){assert.ok((await p.locator('.day-header .rental-conflict').innerText()).includes('11:00'));assert.ok((await p.locator('.timeline').innerText()).includes('尚待供應商確認'));assert.equal(await p.locator('[data-map-pin="rental"]').count(),1);assert.ok((await p.locator('.timeline').innerText()).includes('05:30'));assert.ok((await p.locator('.day-flight-summary').innerText()).includes('CI 0120'));}
+  if(i===5){const text=await p.locator('.timeline').innerText();for(const t of ['09:00','10:15','11:00','還車','計程車'])assert.ok(text.includes(t));assert.ok(!text.includes('15:00–16:30'));assert.ok((await p.locator('.rental-day-notice').innerText()).includes('11:00'));assert.ok((await p.locator('.route-row a').getAttribute('href')).includes('Hello'));assert.ok((await p.locator('.map-legend').innerText()).includes('Hello'));}
   if(i===6){for(const text of ['08:00','08:15','09:00','11:55','12:35'])assert.ok((await p.locator('.timeline').innerText()).includes(text));assert.ok((await p.locator('.day-flight-summary').innerText()).includes('CI 0121'));}
   const mapIds=await p.evaluate(i=>dayMapPoints(i),i);
   assert.equal(await p.locator('[data-map-pin]').count(),mapIds.length);
@@ -92,8 +97,10 @@ const output = process.env.ARTIFACT_DIR || process.env.TMPDIR || '.';
  }
  await p.setViewportSize({width:390,height:844});await p.click('[data-tab="itinerary"]');await p.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await p.screenshot({path:output+'/okinawa-mobile.png',fullPage:true});
  await p.locator('#flight-overview').screenshot({path:output+'/okinawa-flights-mobile.png'});
+ await p.locator('#rental-overview').screenshot({path:output+'/okinawa-rental-mobile.png'});
  await p.evaluate(()=>beforePrint());assert.equal(await p.locator('.day-panel').count(),7);
  assert.equal(await p.locator('#view .flight-card').count(),2);
+ assert.equal(await p.locator('#view .rental-card').count(),1);
  await p.pdf({path:output+'/okinawa-itinerary.pdf',format:'A4',printBackground:true,margin:{top:'12mm',bottom:'12mm',left:'10mm',right:'10mm'}});
  await p.evaluate(()=>afterPrint());assert.equal(await p.locator('.day-panel').count(),1);
  const blocked=await browser.newContext();await blocked.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw new Error('blocked')}});});const bp=await blocked.newPage();bp.on('pageerror',e=>errors.push(e.message));await bp.goto(base);await bp.waitForSelector('.day-panel');assert.ok((await bp.locator('.notes-status').innerText()).includes('無法儲存'));
